@@ -21,7 +21,7 @@ module GHC.ST (
         fixST, runST,
 
         -- * Unsafe functions
-        liftST, unsafeInterleaveST
+        liftST, unsafeInterleaveST, unsafeDupableInterleaveST
     ) where
 
 import GHC.Base
@@ -84,9 +84,27 @@ data STret s a = STret (State# s) a
 liftST :: ST s a -> State# s -> STret s a
 liftST (ST m) = \s -> case m s of (# s', r #) -> STret s' r
 
-{-# NOINLINE unsafeInterleaveST #-}
+noDuplicateST :: ST s ()
+noDuplicateST = ST $ \s -> (# unsafeCoerce# noDuplicate# s, () #)
+
+-- | 'unsafeInterleaveST' allows 'ST' computation to be deferred
+-- lazily.  When passed a value of type @ST a@, the 'ST' computation will
+-- only be performed when the value of the @a@ is demanded.
+{-# INLINE unsafeInterleaveST #-}
 unsafeInterleaveST :: ST s a -> ST s a
-unsafeInterleaveST (ST m) = ST ( \ s ->
+unsafeInterleaveST m = unsafeDupableInterleaveST (noDuplicateST >> m)
+
+-- | 'unsafeDupableInterleaveST' allows 'ST' computation to be deferred
+-- lazily.  When passed a value of type @ST a@, the 'ST' computation will
+-- only be performed when the value of the @a@ is demanded.
+--
+-- The computation may be performed multiple times by different threads,
+-- possibly at the same time. To prevent this, use 'unsafeInterleaveST' instead.
+--
+-- @since ?????
+{-# NOINLINE unsafeDupableInterleaveST #-}
+unsafeDupableInterleaveST :: ST s a -> ST s a
+unsafeDupableInterleaveST (ST m) = ST ( \ s ->
     let
         r = case m s of (# _, res #) -> res
     in

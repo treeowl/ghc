@@ -131,6 +131,16 @@ unsafeInterleaveIO m = unsafeDupableInterleaveIO (noDuplicate >> m)
 -- share and sometimes not (plus it probably breaks the noDuplicate).
 -- So now, we do not inline unsafeDupableInterleaveIO.
 
+{-|
+'unsafeDupableInterleaveIO' allows 'IO' computation to be deferred lazily.
+When passed a value of type @IO a@, the 'IO' will only be performed
+when the value of the @a@ is demanded.
+
+The computation may be performed multiple times by different threads,
+possibly at the same time. To ensure that the computation is performed
+only once, use 'unsafeInterleaveIO' instead.
+-}
+
 {-# NOINLINE unsafeDupableInterleaveIO #-}
 unsafeDupableInterleaveIO :: IO a -> IO a
 unsafeDupableInterleaveIO (IO m)
