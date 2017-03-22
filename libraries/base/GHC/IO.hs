@@ -103,7 +103,7 @@ ioToST (IO m) = (ST m)
 unsafeIOToST        :: IO a -> ST s a
 unsafeIOToST (IO io) = ST $ \ s -> (unsafeCoerce# io) s
 
--- | Convert an 'ST' action to an 'ST' action.
+-- | Convert an 'ST' action to an 'IO' action.
 -- This relies on 'IO' and 'ST' having the same representation modulo the
 -- constraint on the type of the state.
 --
