@@ -607,6 +607,11 @@ gen_Foldable_binds loc tycon
     foldMap_match_ctxt = FunRhs foldMap_name Prefix
 
 gen_Foldable_binds loc tycon
+  | null data_cons  -- There's no real point producing anything but
+                    -- foldMap for a type with no constructors.
+  = (unitBag foldMap_bind, emptyBag)
+
+  | otherwise
   = (listToBag [foldr_bind, foldMap_bind], emptyBag)
   where
     data_cons = tyConDataCons tycon
@@ -618,7 +623,16 @@ gen_Foldable_binds loc tycon
       where
         parts = sequence $ foldDataConArgs ft_foldr con
 
-    foldMap_bind = mkRdrFunBind (L loc foldMap_RDR) (map foldMap_eqn data_cons)
+    foldMap_name = L loc foldMap_RDR
+    foldMap_match_ctxt = FunRhs foldMap_name Prefix
+    foldMap_bind = mkRdrFunBind foldMap_name foldMap_eqns
+
+    foldMap_eqns
+      | null data_cons = [mkSimpleMatch foldMap_match_ctxt
+                                        [nlWildPat, nlWildPat]
+                                        mempty_Expr]
+      | otherwise = map foldMap_eqn data_cons
+
     foldMap_eqn con
       = evalState (match_foldMap [f_Pat] con =<< parts) bs_RDRs
       where
@@ -748,8 +762,16 @@ gen_Traversable_binds loc tycon
   where
     data_cons = tyConDataCons tycon
 
-    traverse_bind = mkRdrFunBind (L loc traverse_RDR) eqns
-    eqns = map traverse_eqn data_cons
+    traverse_name = L loc traverse_RDR
+    traverse_match_ctxt = FunRhs traverse_name Prefix
+    traverse_bind = mkRdrFunBind traverse_name traverse_eqns
+    traverse_eqns
+      | null data_cons
+      = [mkSimpleMatch traverse_match_ctxt
+                       [nlWildPat, z_Pat]
+                       (nlHsApp pure_Expr (nlHsCase z_Expr []))]
+      | otherwise
+      = map traverse_eqn data_cons
     traverse_eqn con
       = evalState (match_for_con [f_Pat] con =<< parts) bs_RDRs
       where
@@ -797,7 +819,7 @@ gen_Traversable_binds loc tycon
 -----------------------------------------------------------------------
 
 f_Expr, z_Expr, fmap_Expr, replace_Expr, mempty_Expr, foldMap_Expr,
-    traverse_Expr, coerce_Expr :: LHsExpr RdrName
+    traverse_Expr, coerce_Expr, pure_Expr :: LHsExpr RdrName
 f_Expr        = nlHsVar f_RDR
 z_Expr        = nlHsVar z_RDR
 fmap_Expr     = nlHsVar fmap_RDR
@@ -806,6 +828,7 @@ mempty_Expr   = nlHsVar mempty_RDR
 foldMap_Expr  = nlHsVar foldMap_RDR
 traverse_Expr = nlHsVar traverse_RDR
 coerce_Expr   = nlHsVar coerce_RDR
+pure_Expr     = nlHsVar pure_RDR
 
 coerce_RDR :: RdrName
 coerce_RDR = getRdrName coerceId
@@ -1057,4 +1080,80 @@ decide not to do so because:
 
    which does not typecheck, since GHC cannot unify the rank-2 type variables
    in the types of b and (fmap f a).
+
+Note [Phantom types with Functor, Foldable, and Traversable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Given a type F :: * -> * whose type argument has a phantom role, we can always
+produce lawful Functor and Traversable instances using
+
+    fmap _ = coerce
+    traverse _ = pure . coerce
+
+Indeed, these are equivalent to any *strictly lawful* instances one could write:
+that is, if instances obey the laws under true equality (rather than up to
+some equivalence relation), then they will be equivalent to these. These
+definitions are incredibly cheap, so we want to use them even if it means
+ignoring some non-strictly-lawful instance in an embedded type.
+
+Foldable has far fewer laws to work with, which leaves us unwelcome
+freedom in implementing it. At a minimum, we would like to ensure that
+a derived foldMap is always at least as good as foldMapDefault with a
+derived traverse. To accomplish that, we must define
+
+   foldMap _ _ = mempty in these cases.
+
+This may have different strictness properties from a standard derivation. Consider
+
+   data NotAList a = Nil | Cons (NotAList a) deriving Foldable
+
+The usual deriving mechanism would produce
+
+   foldMap _ Nil = mempty
+   foldMap f (Cons x) = foldMap f x
+
+which is strict in the entire spine of the NotAList.
+
+Final point: why do we even care about such types? Users will rarely if ever
+map, fold, or traverse over such things themselves, but other derived
+instances may:
+
+   data Hasn'tAList a = NotHere a (NotAList a) deriving Foldable
+
+Note [EmptyDataDecls with Functor, Foldable, and Traversable]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+There are some slightly tricky decisions to make about how to handle
+Functor, Foldable, and Traversable instances for types with no constructors.
+For fmap, the two basic options are
+
+   fmap _ _ = error "Sorry, no constructors"
+
+or
+
+   fmap _ z = case z of
+
+In most cases, the latter is more helpful: if the thunk passed to fmap
+throws an exception, we're generally going to be much more interested in
+that exception than in the fact that there aren't any constructors.
+
+In order to match the semantics for phantoms (see note above), we need to
+be a bit careful about 'traverse'. The obvious definition would be
+
+   traverse _ z = case z of
+
+but this is stricter than the one for phantoms. We instead use
+
+   traverse _ z = pure $ case z of
+
+For foldMap, the obvious choices are
+
+   foldMap _ _ = mempty
+
+or
+
+   foldMap _ z = case z of
+
+We choose the first one to be consistent with what foldMapDefault does for
+a derived Traversable instance.
 -}
