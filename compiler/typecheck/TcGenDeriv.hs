@@ -1348,8 +1348,8 @@ gen_data dflags data_type_name constr_names loc rep_tc
     gfoldl_bind = mk_HRFunBind 2 loc gfoldl_RDR (map gfoldl_eqn data_cons)
 
     gfoldl_eqn con
-      = ([nlVarPat k_RDR, nlVarPat z_RDR, nlConVarPat con_name as_needed],
-                       foldl mk_k_app (nlHsVar z_RDR `nlHsApp` nlHsVar con_name) as_needed)
+      = ([nlVarPat k_RDR, z_Pat, nlConVarPat con_name as_needed],
+                       foldl mk_k_app (z_Expr `nlHsApp` nlHsVar con_name) as_needed)
                    where
                      con_name ::  RdrName
                      con_name = getRdrName con
@@ -1369,7 +1369,7 @@ gen_data dflags data_type_name constr_names loc rep_tc
 
     gunfold_alt dc = mkHsCaseAlt (mk_unfold_pat dc) (mk_unfold_rhs dc)
     mk_unfold_rhs dc = foldr nlHsApp
-                           (nlHsVar z_RDR `nlHsApp` nlHsVar (getRdrName dc))
+                           (z_Expr `nlHsApp` nlHsVar (getRdrName dc))
                            (replicate (dataConSourceArity dc) (nlHsVar k_RDR))
 
     mk_unfold_pat dc    -- Last one is a wild-pat, to avoid
@@ -1862,22 +1862,21 @@ mk_HRFunBind arity loc fun pats_and_exprs
               | (p,e) <-pats_and_exprs]
 
 mkRdrFunBind :: Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
-mkRdrFunBind = mkHRRdrFunBind 0
+mkRdrFunBind = mkHRRdrFunBind 1
 
 mkHRRdrFunBind :: Arity -> Located RdrName -> [LMatch RdrName (LHsExpr RdrName)] -> LHsBind RdrName
-mkHRRdrFunBind arity fun@(L loc fun_rdr) matches = L loc (mkFunBind fun matches')
+mkHRRdrFunBind arity fun@(L loc _fun_rdr) matches = L loc (mkFunBind fun matches')
  where
    -- Catch-all eqn looks like
-   --     fmap = error "Void fmap"
+   --     fmap _ x = case x of {}
    -- It's needed if there no data cons at all,
    -- which can happen with -XEmptyDataDecls
    -- See Trac #4302
    matches' = if null matches
               then [mkMatch (FunRhs fun Prefix)
-                            (replicate arity nlWildPat)
-                            (error_Expr str) (noLoc emptyLocalBinds)]
+                            (replicate arity nlWildPat ++ [z_Pat])
+                            (nlHsCase z_Expr []) (noLoc emptyLocalBinds)]
               else matches
-   str = "Void " ++ occNameString (rdrNameOcc fun_rdr)
 
 box ::         String           -- The class involved
             -> TyCon            -- The tycon involved
@@ -2079,11 +2078,12 @@ as_RDRs         = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) ..
 bs_RDRs         = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
 cs_RDRs         = [ mkVarUnqual (mkFastString ("c"++show i)) | i <- [(1::Int) .. ] ]
 
-a_Expr, b_Expr, c_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
+a_Expr, b_Expr, c_Expr, z_Expr, ltTag_Expr, eqTag_Expr, gtTag_Expr, false_Expr,
     true_Expr :: LHsExpr RdrName
 a_Expr          = nlHsVar a_RDR
 b_Expr          = nlHsVar b_RDR
 c_Expr          = nlHsVar c_RDR
+z_Expr          = nlHsVar z_RDR
 ltTag_Expr      = nlHsVar ltTag_RDR
 eqTag_Expr      = nlHsVar eqTag_RDR
 gtTag_Expr      = nlHsVar gtTag_RDR

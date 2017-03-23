@@ -33,6 +33,7 @@ import Type
 import Util
 import Var
 import VarSet
+import MkId (coerceId)
 
 import Data.Maybe (catMaybes, isJust)
 
@@ -124,6 +125,18 @@ It is better to produce too many lambdas than to eta expand, see ticket #7436.
 -}
 
 gen_Functor_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+-- When the argument is phantom, we can use  fmap _ = coerce
+gen_Functor_binds loc tycon
+  | Phantom <- last (tyConRoles tycon)
+  = (unitBag fmap_bind, emptyBag)
+  where
+    fmap_name = L loc fmap_RDR
+    fmap_bind = mkRdrFunBind fmap_name fmap_eqns
+    fmap_eqns = [mkSimpleMatch fmap_match_ctxt
+                               [nlWildPat]
+                               coerce_Expr]
+    fmap_match_ctxt = FunRhs fmap_name Prefix
+
 gen_Functor_binds loc tycon
   = (listToBag [fmap_bind, replace_bind], emptyBag)
   where
@@ -137,11 +150,7 @@ gen_Functor_binds loc tycon
       where
         parts = sequence $ foldDataConArgs ft_fmap con
 
-    fmap_eqns
-         | null data_cons = [mkSimpleMatch fmap_match_ctxt
-                                           [nlWildPat, nlWildPat]
-                                           (error_Expr "Void fmap")]
-         | otherwise      = map fmap_eqn data_cons
+    fmap_eqns = map fmap_eqn data_cons
 
     ft_fmap :: FFoldType (State [RdrName] (LHsExpr RdrName))
     ft_fmap = FT { ft_triv = mkSimpleLam $ \x -> return x
@@ -162,7 +171,7 @@ gen_Functor_binds loc tycon
                    -- fmap f = fmap g
                  , ft_forall = \_ g -> g
                  , ft_bad_app = panic "in other argument"
-                 , ft_co_var = panic "contravariant" }
+                 , ft_co_var = panic "contravariant in ft_fmap" }
 
     -- See Note [deriving <$]
     replace_name = L loc replace_RDR
@@ -174,11 +183,7 @@ gen_Functor_binds loc tycon
       where
         parts = traverse (fmap replace) $ foldDataConArgs ft_replace con
 
-    replace_eqns
-         | null data_cons = [mkSimpleMatch replace_match_ctxt
-                                           [nlWildPat, nlWildPat]
-                                           (error_Expr "Void <$")]
-         | otherwise      = map replace_eqn data_cons
+    replace_eqns = map replace_eqn data_cons
 
     ft_replace :: FFoldType (State [RdrName] Replacer)
     ft_replace = FT { ft_triv = fmap Nested $ mkSimpleLam $ \x -> return x
@@ -206,7 +211,7 @@ gen_Functor_binds loc tycon
                    -- (p <$) = fmap (p <$)
                  , ft_forall = \_ g -> g
                  , ft_bad_app = panic "in other argument"
-                 , ft_co_var = panic "contravariant" }
+                 , ft_co_var = panic "contravariant in replace" }
 
     -- Con a1 a2 ... -> Con (f1 a1) (f2 a2) ...
     match_for_con :: HsMatchContext RdrName
@@ -395,7 +400,7 @@ deepSubtypesContaining tv
             , ft_tup = \_ xs -> concat xs
             , ft_ty_app = (:)
             , ft_bad_app = panic "in other argument"
-            , ft_co_var = panic "contravariant"
+            , ft_co_var = panic "contravariant in deepSubtypesContaining"
             , ft_forall = \v xs -> filterOut ((v `elemVarSet`) . tyCoVarsOfType) xs })
 
 
@@ -456,7 +461,8 @@ mkSimpleConMatch ctxt fold extra_pats con insides = do
     let pat = if null vars_needed
           then bare_pat
           else nlParPat bare_pat
-    rhs <- fold con_name (zipWith nlHsApp insides (map nlHsVar vars_needed))
+    rhs <- fold con_name
+                (zipWith (\i v -> i `nlHsApp` nlHsVar v) insides vars_needed)
     return $ mkMatch ctxt (extra_pats ++ [pat]) rhs
                      (noLoc emptyLocalBinds)
 
@@ -492,21 +498,19 @@ mkSimpleConMatch2 ctxt fold extra_pats con insides = do
         -- Make sure to zip BEFORE invoking catMaybes. We want the variable
         -- indicies in each expression to match up with the argument indices
         -- in con_expr (defined below).
-        exps = catMaybes $ zipWith (\i v -> (`nlHsApp` v) <$> i)
-                                   insides (map nlHsVar vars_needed)
+        exps = catMaybes $ zipWith (\i v -> (`nlHsApp` nlHsVar v) <$> i)
+                                   insides vars_needed
         -- An element of argTysTyVarInfo is True if the constructor argument
         -- with the same index has a type which mentions the last type
         -- variable.
         argTysTyVarInfo = map isJust insides
-        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo as_RDRs
+        (asWithTyVar, asWithoutTyVar) = partitionByList argTysTyVarInfo as_Vars
 
         con_expr
-          | null asWithTyVar = nlHsApps con_name $ map nlHsVar asWithoutTyVar
+          | null asWithTyVar = nlHsApps con_name asWithoutTyVar
           | otherwise =
               let bs   = filterByList  argTysTyVarInfo bs_RDRs
-                  vars = filterByLists argTysTyVarInfo
-                                       (map nlHsVar bs_RDRs)
-                                       (map nlHsVar as_RDRs)
+                  vars = filterByLists argTysTyVarInfo bs_Vars as_Vars
               in mkHsLam (map nlVarPat bs) (nlHsApps con_name vars)
 
     rhs <- fold con_expr exps
@@ -590,6 +594,18 @@ See Note [DeriveFoldable with ExistentialQuantification].
 -}
 
 gen_Foldable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+-- When the parameter is phantom, we can use foldMap _ _ = mempty
+gen_Foldable_binds loc tycon
+  | Phantom <- last (tyConRoles tycon)
+  = (unitBag foldMap_bind, emptyBag)
+  where
+    foldMap_name = L loc foldMap_RDR
+    foldMap_bind = mkRdrFunBind foldMap_name foldMap_eqns
+    foldMap_eqns = [mkSimpleMatch foldMap_match_ctxt
+                                  [nlWildPat, nlWildPat]
+                                  mempty_Expr]
+    foldMap_match_ctxt = FunRhs foldMap_name Prefix
+
 gen_Foldable_binds loc tycon
   = (listToBag [foldr_bind, foldMap_bind], emptyBag)
   where
@@ -715,6 +731,18 @@ See Note [Generated code for DeriveFoldable and DeriveTraversable].
 -}
 
 gen_Traversable_binds :: SrcSpan -> TyCon -> (LHsBinds RdrName, BagDerivStuff)
+-- When the argument is phantom, we can use traverse = pure . coerce
+gen_Traversable_binds loc tycon
+  | Phantom <- last (tyConRoles tycon)
+  = (unitBag traverse_bind, emptyBag)
+  where
+    traverse_name = L loc traverse_RDR
+    traverse_bind = mkRdrFunBind traverse_name traverse_eqns
+    traverse_eqns = [mkSimpleMatch traverse_match_ctxt
+                                   [nlWildPat, z_Pat]
+                                   (nlHsApps pure_RDR [nlHsApp coerce_Expr z_Expr])]
+    traverse_match_ctxt = FunRhs traverse_name Prefix
+
 gen_Traversable_binds loc tycon
   = (unitBag traverse_bind, emptyBag)
   where
@@ -769,7 +797,7 @@ gen_Traversable_binds loc tycon
 -----------------------------------------------------------------------
 
 f_Expr, z_Expr, fmap_Expr, replace_Expr, mempty_Expr, foldMap_Expr,
-    traverse_Expr :: LHsExpr RdrName
+    traverse_Expr, coerce_Expr :: LHsExpr RdrName
 f_Expr        = nlHsVar f_RDR
 z_Expr        = nlHsVar z_RDR
 fmap_Expr     = nlHsVar fmap_RDR
@@ -777,6 +805,10 @@ replace_Expr  = nlHsVar replace_RDR
 mempty_Expr   = nlHsVar mempty_RDR
 foldMap_Expr  = nlHsVar foldMap_RDR
 traverse_Expr = nlHsVar traverse_RDR
+coerce_Expr   = nlHsVar coerce_RDR
+
+coerce_RDR :: RdrName
+coerce_RDR = getRdrName coerceId
 
 f_RDR, z_RDR :: RdrName
 f_RDR = mkVarUnqual (fsLit "f")
@@ -785,6 +817,10 @@ z_RDR = mkVarUnqual (fsLit "z")
 as_RDRs, bs_RDRs :: [RdrName]
 as_RDRs = [ mkVarUnqual (mkFastString ("a"++show i)) | i <- [(1::Int) .. ] ]
 bs_RDRs = [ mkVarUnqual (mkFastString ("b"++show i)) | i <- [(1::Int) .. ] ]
+
+as_Vars, bs_Vars :: [LHsExpr RdrName]
+as_Vars = map nlHsVar as_RDRs
+bs_Vars = map nlHsVar bs_RDRs
 
 f_Pat, z_Pat :: LPat RdrName
 f_Pat = nlVarPat f_RDR

@@ -699,15 +699,11 @@ mkSum :: GenericKind_ -- Generic or Generic1?
           [Alt])     -- Alternatives for the Trep->T "to" function
 
 -- Datatype without any constructors
-mkSum _ _ tycon [] = ([from_alt], [to_alt])
+mkSum _ _ _ [] = ([from_alt], [to_alt])
   where
-    from_alt = (nlWildPat, makeError errMsgFrom)
-    to_alt   = (nlWildPat, makeError errMsgTo)
+    from_alt = (x_Pat, nlHsCase x_Expr [])
+    to_alt   = (x_Pat, nlHsCase x_Expr [])
                -- These M1s are meta-information for the datatype
-    makeError s = nlHsApp (nlHsVar error_RDR) (nlHsLit (mkHsString s))
-    tyConStr   = occNameString (nameOccName (tyConName tycon))
-    errMsgFrom = "No generic representation for empty datatype " ++ tyConStr
-    errMsgTo   = "No values for empty datatype " ++ tyConStr
 
 -- Datatype with at least one constructor
 mkSum gk_ us _ datacons =
