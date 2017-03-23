@@ -47,7 +47,7 @@ module GHC.Exts
         lazy, inline, oneShot,
 
         -- * Running 'RealWorld' state transformers
-        runRW#,
+        runRW#, runFW#,
 
         -- * Safe coercions
         --

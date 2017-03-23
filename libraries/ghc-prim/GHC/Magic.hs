@@ -23,7 +23,7 @@
 --
 -----------------------------------------------------------------------------
 
-module GHC.Magic ( inline, noinline, lazy, oneShot, runRW# ) where
+module GHC.Magic ( inline, noinline, lazy, oneShot, runRW#, runFW# ) where
 
 import GHC.Prim
 import GHC.CString ()
@@ -117,4 +117,23 @@ runRW# m = m realWorld#
 runRW# = runRW#   -- The realWorld# is too much for haddock
 #endif
 {-# NOINLINE runRW# #-}
+-- This is inlined manually in CorePrep
+
+-- | Apply a function to a 'State# FakeWorld' token. When manually applying
+-- a function to `fakeWorld#`, it is necessary to use `NOINLINE` to prevent
+-- semantically undesirable floating. `runFW#` is inlined, but only very late
+-- in compilation after all floating is complete.
+
+-- 'runFW#' is representation polymorphic: the result may have a lifted or
+-- unlifted type.
+
+runFW# :: forall (r :: RuntimeRep) (o :: TYPE r).
+          (State# FakeWorld -> o) -> o
+-- See Note [runRW magic] in MkId
+#if !defined(__HADDOCK_VERSION__)
+runFW# m = m fakeWorld#
+#else
+runFW# = runFW#   -- The fakeWorld# is too much for haddock
+#endif
+{-# NOINLINE runFW# #-}
 -- This is inlined manually in CorePrep

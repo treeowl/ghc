@@ -18,7 +18,7 @@ import OccurAnal
 
 import HscTypes
 import PrelNames
-import MkId             ( realWorldPrimId )
+import MkId             ( realWorldPrimId, fakeWorldPrimId )
 import CoreUtils
 import CoreArity
 import CoreFVs
@@ -815,6 +815,12 @@ cpeApp top_env expr
         = case arg of
             Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
             _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+        | f `hasKey` runFWKey
+        -- Replace (runFW# f) by (f fakeWorld#), beta reducing if possible (this
+        -- is why we return a CorePrepEnv as well)
+        = case arg of
+            Lam s body -> cpe_app (extendCorePrepEnv env s fakeWorldPrimId) body [] 0
+            _          -> cpe_app env arg [CpeApp (Var fakeWorldPrimId)] 1
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1

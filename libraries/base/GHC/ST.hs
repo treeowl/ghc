@@ -133,5 +133,5 @@ instance  Show (ST s a)  where
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
-runST (ST st_rep) = case runRW# st_rep of (# _, a #) -> a
+runST (ST st_rep) = case runFW# st_rep of (# _, a #) -> a
 -- See Note [Definition of runRW#] in GHC.Magic
