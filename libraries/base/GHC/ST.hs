@@ -133,5 +133,9 @@ instance  Show (ST s a)  where
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
-runST (ST st_rep) = case runFW# st_rep of (# _, a #) -> a
+-- Pushing the case inside the runFW# argument allows case-of-case
+-- to do its thing, and thereby ensures that the demand analyzer
+-- sees that runST is strict in the result value. Hopefully this is safe.
+runST (ST st_rep) = runFW# (\s -> case st_rep s of (# _, a #) -> a)
+
 -- See Note [Definition of runRW#] in GHC.Magic
