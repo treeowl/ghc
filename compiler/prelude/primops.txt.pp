@@ -2310,6 +2310,11 @@ primtype RealWorld
         {\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
         {\tt RealWorld}; it's only used in the type system, to parameterise {\tt State\#}. }
 
+primtype FakeWorld
+        { {\tt FakeWorld} is deeply magical.  It is {\it primitive}, but it is not
+        {\it unlifted} (hence {\tt ptrArg}).  We never manipulate values of type
+        {\tt FakeWorld}; it's only used in the type system, to parameterise {\tt State\#}. }
+
 primtype ThreadId#
         {(In a non-concurrent implementation, this can be a singleton
         type, whose (unique) value is returned by {\tt myThreadId\#}.  The

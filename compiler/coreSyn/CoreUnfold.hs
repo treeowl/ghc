@@ -58,7 +58,7 @@ import IdInfo
 import BasicTypes       ( Arity, InlineSpec(..), inlinePragmaSpec )
 import Type
 import PrelNames
-import TysPrim          ( realWorldStatePrimTy )
+import TysPrim          ( realWorldStatePrimTy, fakeWorldStatePrimTy )
 import Bag
 import Util
 import Outputable
@@ -509,7 +509,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     size_up (Type _)   = sizeZero           -- Types cost nothing
     size_up (Coercion _) = sizeZero
     size_up (Lit lit)  = sizeN (litSize lit)
-    size_up (Var f) | isRealWorldId f = sizeZero
+    size_up (Var f) | isWorldId f = sizeZero
                       -- Make sure we get constructor discounts even
                       -- on nullary constructors
                     | otherwise       = size_up_call f [] 0
@@ -517,10 +517,10 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     size_up (App fun arg)
       | isTyCoArg arg = size_up fun
       | otherwise     = size_up arg  `addSizeNSD`
-                        size_up_app fun [arg] (if isRealWorldExpr arg then 1 else 0)
+                        size_up_app fun [arg] (if isWorldExpr arg then 1 else 0)
 
     size_up (Lam b e)
-      | isId b && not (isRealWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)
+      | isId b && not (isWorldId b) = lamScrutDiscount dflags (size_up e `addSizeN` 10)
       | otherwise = size_up e
 
     size_up (Let (NonRec binder rhs) body)
@@ -622,7 +622,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
     -- size_up_app is used when there's ONE OR MORE value args
     size_up_app (App fun arg) args voids
         | isTyCoArg arg                  = size_up_app fun args voids
-        | isRealWorldExpr arg            = size_up_app fun (arg:args) (voids + 1)
+        | isWorldExpr arg            = size_up_app fun (arg:args) (voids + 1)
         | otherwise                      = size_up arg  `addSizeNSD`
                                            size_up_app fun (arg:args) voids
     size_up_app (Var fun)     args voids = size_up_call fun args voids
@@ -686,12 +686,13 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                  (xs `unionBags` ys)
                                  d2  -- Ignore d1
 
-    isRealWorldId id = idType id `eqType` realWorldStatePrimTy
+    isWorldId id = (idType id `eqType` realWorldStatePrimTy) ||
+                   (idType id `eqType` fakeWorldStatePrimTy)
 
     -- an expression of type State# RealWorld must be a variable
-    isRealWorldExpr (Var id)   = isRealWorldId id
-    isRealWorldExpr (Tick _ e) = isRealWorldExpr e
-    isRealWorldExpr _          = False
+    isWorldExpr (Var id)   = isWorldId id
+    isWorldExpr (Tick _ e) = isWorldExpr e
+    isWorldExpr _          = False
 
 -- | Finds a nominal size of a string literal.
 litSize :: Literal -> Int

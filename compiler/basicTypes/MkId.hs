@@ -27,9 +27,9 @@ module MkId (
 
         -- And some particular Ids; see below for why they are wired in
         wiredInIds, ghcPrimIds,
-        unsafeCoerceName, unsafeCoerceId, realWorldPrimId,
+        unsafeCoerceName, unsafeCoerceId, realWorldPrimId, fakeWorldPrimId,
         voidPrimId, voidArgId,
-        nullAddrId, seqId, lazyId, lazyIdKey, runRWId,
+        nullAddrId, seqId, lazyId, lazyIdKey, runRWId, runFWId,
         coercionTokenId, magicDictId, coerceId,
         proxyHashId, noinlineId, noinlineIdName,
 
@@ -122,7 +122,7 @@ is right here.
 
 wiredInIds :: [Id]
 wiredInIds
-  =  [lazyId, dollarId, oneShotId, runRWId, noinlineId]
+  =  [lazyId, dollarId, oneShotId, runRWId, runFWId, noinlineId]
   ++ errorIds           -- Defined in MkCore
   ++ ghcPrimIds
 
@@ -132,6 +132,7 @@ ghcPrimIds
   = [   -- These can't be defined in Haskell, but they have
         -- perfectly reasonable unfoldings in Core
     realWorldPrimId,
+    fakeWorldPrimId,
     voidPrimId,
     unsafeCoerceId,
     nullAddrId,
@@ -1108,13 +1109,14 @@ another gun with which to shoot yourself in the foot.
 -}
 
 lazyIdName, unsafeCoerceName, nullAddrName, seqName,
-   realWorldName, voidPrimIdName, coercionTokenName,
+   realWorldName, fakeWorldName, voidPrimIdName, coercionTokenName,
    magicDictName, coerceName, proxyName, dollarName, oneShotName,
-   runRWName, noinlineIdName :: Name
+   runRWName, runFWName, noinlineIdName :: Name
 unsafeCoerceName  = mkWiredInIdName gHC_PRIM  (fsLit "unsafeCoerce#")  unsafeCoerceIdKey  unsafeCoerceId
 nullAddrName      = mkWiredInIdName gHC_PRIM  (fsLit "nullAddr#")      nullAddrIdKey      nullAddrId
 seqName           = mkWiredInIdName gHC_PRIM  (fsLit "seq")            seqIdKey           seqId
 realWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "realWorld#")     realWorldPrimIdKey realWorldPrimId
+fakeWorldName     = mkWiredInIdName gHC_PRIM  (fsLit "fakeWorld#")     fakeWorldPrimIdKey fakeWorldPrimId
 voidPrimIdName    = mkWiredInIdName gHC_PRIM  (fsLit "void#")          voidPrimIdKey      voidPrimId
 lazyIdName        = mkWiredInIdName gHC_MAGIC (fsLit "lazy")           lazyIdKey          lazyId
 coercionTokenName = mkWiredInIdName gHC_PRIM  (fsLit "coercionToken#") coercionTokenIdKey coercionTokenId
@@ -1124,6 +1126,7 @@ proxyName         = mkWiredInIdName gHC_PRIM  (fsLit "proxy#")         proxyHash
 dollarName        = mkWiredInIdName gHC_BASE  (fsLit "$")              dollarIdKey        dollarId
 oneShotName       = mkWiredInIdName gHC_MAGIC (fsLit "oneShot")        oneShotKey         oneShotId
 runRWName         = mkWiredInIdName gHC_MAGIC (fsLit "runRW#")         runRWKey           runRWId
+runFWName         = mkWiredInIdName gHC_MAGIC (fsLit "runFW#")         runFWKey           runFWId
 noinlineIdName    = mkWiredInIdName gHC_MAGIC (fsLit "noinline") noinlineIdKey noinlineId
 
 dollarId :: Id  -- Note [dollarId magic]
@@ -1275,6 +1278,27 @@ runRWId = pcMiscPrelId runRWName ty info
     -- State# RealWorld -> o
     arg_ty  = stateRW `mkFunTy` ret_ty
     -- (State# RealWorld -> o) -> o
+    ty      = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
+              arg_ty `mkFunTy` ret_ty
+
+runFWId :: Id -- See Note [runRW magic] in this module
+runFWId = pcMiscPrelId runFWName ty info
+  where
+    info = noCafIdInfo `setInlinePragInfo` neverInlinePragma
+                       `setStrictnessInfo` strict_sig
+                       `setArityInfo`      1
+    strict_sig = mkClosedStrictSig [strictApply1Dmd] topRes
+      -- Important to express its strictness,
+      -- since it is not inlined until CorePrep
+      -- Also see Note [runRW arg] in CorePrep
+
+    -- State# FakeWorld
+    stateFW = mkTyConApp statePrimTyCon [fakeWorldTy]
+    -- o
+    ret_ty  = openAlphaTy
+    -- State# FakeWorld -> o
+    arg_ty  = stateFW `mkFunTy` ret_ty
+    -- (State# FakeWorld -> o) -> o
     ty      = mkSpecForAllTys [runtimeRep1TyVar, openAlphaTyVar] $
               arg_ty `mkFunTy` ret_ty
 
@@ -1599,6 +1623,12 @@ realWorldPrimId = pcMiscPrelId realWorldName realWorldStatePrimTy
                      (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
                                   `setOneShotInfo` stateHackOneShot
                                   `setNeverLevPoly` realWorldStatePrimTy)
+
+fakeWorldPrimId :: Id   -- :: State# RealWorld
+fakeWorldPrimId = pcMiscPrelId fakeWorldName fakeWorldStatePrimTy
+                     (noCafIdInfo `setUnfoldingInfo` evaldUnfolding    -- Note [evaldUnfoldings]
+                                  `setOneShotInfo` stateHackOneShot
+                                  `setNeverLevPoly` fakeWorldStatePrimTy)
 
 voidPrimId :: Id     -- Global constant :: Void#
 voidPrimId  = pcMiscPrelId voidPrimIdName voidPrimTy

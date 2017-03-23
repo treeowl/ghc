@@ -101,7 +101,7 @@ wrap them up with unsafePerformIO. See Note [Lazy ST and multithreading]. -}
 -- | This is a terrible hack to prevent a thunk from being entered twice.
 -- Simon Peyton Jones would very much like to be rid of it.
 noDup :: a -> a
-noDup a = runRW# (\s ->
+noDup a = runFW# (\s ->
   case noDuplicate# s of
     _ -> a)
 
@@ -202,7 +202,7 @@ instance Fail.MonadFail (ST s) where
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
-runST (ST st) = runRW# (\s -> case st (S# s) of (r, _) -> r)
+runST (ST st) = runFW# (\s -> case st (S# s) of (r, _) -> r)
 
 -- | Allow the result of a state transformer computation to be used (lazily)
 -- inside the computation.
