@@ -1649,7 +1649,7 @@ addrPrimTyConKey, arrayPrimTyConKey, arrayArrayPrimTyConKey, boolTyConKey,
     listTyConKey, foreignObjPrimTyConKey, maybeTyConKey,
     weakPrimTyConKey, mutableArrayPrimTyConKey, mutableArrayArrayPrimTyConKey,
     mutableByteArrayPrimTyConKey, orderingTyConKey, mVarPrimTyConKey,
-    ratioTyConKey, rationalTyConKey, realWorldTyConKey, fakeWorldTyConKey,
+    ratioTyConKey, rationalTyConKey, realWorldTyConKey,
     stablePtrPrimTyConKey, stablePtrTyConKey, eqTyConKey, heqTyConKey,
     smallArrayPrimTyConKey, smallMutableArrayPrimTyConKey :: Unique
 addrPrimTyConKey                        = mkPreludeTyConUnique  1
@@ -1691,7 +1691,6 @@ eqTyConKey                              = mkPreludeTyConUnique 38
 heqTyConKey                             = mkPreludeTyConUnique 39
 arrayArrayPrimTyConKey                  = mkPreludeTyConUnique 40
 mutableArrayArrayPrimTyConKey           = mkPreludeTyConUnique 41
-fakeWorldTyConKey                       = mkPreludeTyConUnique 42
 
 statePrimTyConKey, stableNamePrimTyConKey, stableNameTyConKey,
     mutVarPrimTyConKey, ioTyConKey,
@@ -2056,7 +2055,7 @@ wildCardKey, absentErrorIdKey, augmentIdKey, appendIdKey,
     seqIdKey, irrefutPatErrorIdKey, eqStringIdKey,
     noMethodBindingErrorIdKey, nonExhaustiveGuardsErrorIdKey,
     runtimeErrorIdKey, patErrorIdKey, voidPrimIdKey,
-    realWorldPrimIdKey, fakeWorldPrimIdKey, recConErrorIdKey,
+    realWorldPrimIdKey, recConErrorIdKey,
     unpackCStringUtf8IdKey, unpackCStringAppendIdKey,
     unpackCStringFoldrIdKey, unpackCStringIdKey,
     typeErrorIdKey, divIntIdKey, modIntIdKey :: Unique
@@ -2086,7 +2085,6 @@ voidPrimIdKey                 = mkPreludeMiscIdUnique 21
 typeErrorIdKey                = mkPreludeMiscIdUnique 22
 divIntIdKey                   = mkPreludeMiscIdUnique 23
 modIntIdKey                   = mkPreludeMiscIdUnique 24
-fakeWorldPrimIdKey            = mkPreludeMiscIdUnique 25
 
 unsafeCoerceIdKey, concatIdKey, filterIdKey, zipIdKey, bindIOIdKey,
     returnIOIdKey, newStablePtrIdKey,

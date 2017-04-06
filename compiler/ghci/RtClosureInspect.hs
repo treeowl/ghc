@@ -502,7 +502,6 @@ repPrim t = rep where
     | t == statePrimTyCon            = text "<statethread>"
     | t == proxyPrimTyCon            = text "<proxy>"
     | t == realWorldTyCon            = text "<realworld>"
-    | t == fakeWorldTyCon            = text "<fakeworld>"
     | t == threadIdPrimTyCon         = text "<ThreadId>"
     | t == weakPrimTyCon             = text "<Weak>"
     | t == arrayPrimTyCon            = text "<array>"

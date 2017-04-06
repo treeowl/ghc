@@ -58,7 +58,7 @@ import IdInfo
 import BasicTypes       ( Arity, InlineSpec(..), inlinePragmaSpec )
 import Type
 import PrelNames
-import TysPrim          ( realWorldStatePrimTy, fakeWorldStatePrimTy )
+import TysPrim          ( realWorldStatePrimTy )
 import Bag
 import Util
 import Outputable
@@ -686,8 +686,7 @@ sizeExpr dflags bOMB_OUT_SIZE top_args expr
                                  (xs `unionBags` ys)
                                  d2  -- Ignore d1
 
-    isWorldId id = (idType id `eqType` realWorldStatePrimTy) ||
-                   (idType id `eqType` fakeWorldStatePrimTy)
+    isWorldId id = (idType id `eqType` realWorldStatePrimTy)
 
     -- an expression of type State# RealWorld must be a variable
     isWorldExpr (Var id)   = isWorldId id

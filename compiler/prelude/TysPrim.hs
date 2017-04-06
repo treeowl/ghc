@@ -42,7 +42,6 @@ module TysPrim(
         voidPrimTyCon,          voidPrimTy,
         statePrimTyCon,         mkStatePrimTy,
         realWorldTyCon,         realWorldTy, realWorldStatePrimTy,
-        fakeWorldTyCon,         fakeWorldTy, fakeWorldStatePrimTy,
 
         proxyPrimTyCon,         mkProxyPrimTy,
 
@@ -139,7 +138,6 @@ primTyCons
     , tVarPrimTyCon
     , mutVarPrimTyCon
     , realWorldTyCon
-    , fakeWorldTyCon
     , stablePtrPrimTyCon
     , stableNamePrimTyCon
     , compactPrimTyCon
@@ -174,7 +172,7 @@ mkBuiltInPrimTc fs unique tycon
                   BuiltInSyntax
 
 
-charPrimTyConName, intPrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, fakeWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
+charPrimTyConName, intPrimTyConName, int32PrimTyConName, int64PrimTyConName, wordPrimTyConName, word32PrimTyConName, word64PrimTyConName, addrPrimTyConName, floatPrimTyConName, doublePrimTyConName, statePrimTyConName, proxyPrimTyConName, realWorldTyConName, arrayPrimTyConName, arrayArrayPrimTyConName, smallArrayPrimTyConName, byteArrayPrimTyConName, mutableArrayPrimTyConName, mutableByteArrayPrimTyConName, mutableArrayArrayPrimTyConName, smallMutableArrayPrimTyConName, mutVarPrimTyConName, mVarPrimTyConName, tVarPrimTyConName, stablePtrPrimTyConName, stableNamePrimTyConName, compactPrimTyConName, bcoPrimTyConName, weakPrimTyConName, threadIdPrimTyConName, eqPrimTyConName, eqReprPrimTyConName, eqPhantPrimTyConName, voidPrimTyConName :: Name
 charPrimTyConName             = mkPrimTc (fsLit "Char#") charPrimTyConKey charPrimTyCon
 intPrimTyConName              = mkPrimTc (fsLit "Int#") intPrimTyConKey  intPrimTyCon
 int32PrimTyConName            = mkPrimTc (fsLit "Int32#") int32PrimTyConKey int32PrimTyCon
@@ -192,7 +190,6 @@ eqPrimTyConName               = mkPrimTc (fsLit "~#") eqPrimTyConKey eqPrimTyCon
 eqReprPrimTyConName           = mkBuiltInPrimTc (fsLit "~R#") eqReprPrimTyConKey eqReprPrimTyCon
 eqPhantPrimTyConName          = mkBuiltInPrimTc (fsLit "~P#") eqPhantPrimTyConKey eqPhantPrimTyCon
 realWorldTyConName            = mkPrimTc (fsLit "RealWorld") realWorldTyConKey realWorldTyCon
-fakeWorldTyConName            = mkPrimTc (fsLit "FakeWorld") fakeWorldTyConKey fakeWorldTyCon
 arrayPrimTyConName            = mkPrimTc (fsLit "Array#") arrayPrimTyConKey arrayPrimTyCon
 byteArrayPrimTyConName        = mkPrimTc (fsLit "ByteArray#") byteArrayPrimTyConKey byteArrayPrimTyCon
 arrayArrayPrimTyConName           = mkPrimTc (fsLit "ArrayArray#") arrayArrayPrimTyConKey arrayArrayPrimTyCon
@@ -768,13 +765,6 @@ realWorldTy :: Type
 realWorldTy          = mkTyConTy realWorldTyCon
 realWorldStatePrimTy :: Type
 realWorldStatePrimTy = mkStatePrimTy realWorldTy        -- State# RealWorld
-
-fakeWorldTyCon :: TyCon
-fakeWorldTyCon = mkLiftedPrimTyCon fakeWorldTyConName [] liftedTypeKind []
-fakeWorldTy :: Type
-fakeWorldTy          = mkTyConTy fakeWorldTyCon
-fakeWorldStatePrimTy :: Type
-fakeWorldStatePrimTy = mkStatePrimTy fakeWorldTy        -- State# RealWorld
 
 -- Note: the ``state-pairing'' types are not truly primitive,
 -- so they are defined in \tr{TysWiredIn.hs}, not here.

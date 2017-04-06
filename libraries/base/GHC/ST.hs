@@ -136,6 +136,6 @@ runST :: (forall s. ST s a) -> a
 -- Pushing the case inside the runFW# argument allows case-of-case
 -- to do its thing, and thereby ensures that the demand analyzer
 -- sees that runST is strict in the result value. Hopefully this is safe.
-runST (ST st_rep) = runFW# (\s -> case st_rep s of (# _, a #) -> a)
+runST m = runFW# (\s -> case m of ST st_rep -> case st_rep s of (# _, a #) -> a)
 
 -- See Note [Definition of runRW#] in GHC.Magic

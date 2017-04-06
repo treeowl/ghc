@@ -18,7 +18,7 @@ import OccurAnal
 
 import HscTypes
 import PrelNames
-import MkId             ( realWorldPrimId, fakeWorldPrimId )
+import MkId             ( realWorldPrimId, runRWId )
 import CoreUtils
 import CoreArity
 import CoreFVs
@@ -39,6 +39,7 @@ import VarEnv
 import Id
 import IdInfo
 import TysWiredIn
+import TysPrim          ( realWorldTy )
 import DataCon
 import PrimOp
 import BasicTypes
@@ -785,7 +786,7 @@ cpeApp top_env expr
             = go fun (CpeTick tickish : as) depth
         go terminal as depth = (terminal, as, depth)
 
-    cpe_app :: CorePrepEnv
+    cpe_app :: HasCallStack => CorePrepEnv
             -> CoreExpr
             -> [ArgInfo]
             -> Int
@@ -808,19 +809,30 @@ cpeApp top_env expr
         -- rather than the far superior "f x y".  Test case is par01.
         = let (terminal, args', depth') = collect_args arg
           in cpe_app env terminal (args' ++ args) (depth + depth' - 1)
-    cpe_app env (Var f) [CpeApp _runtimeRep@Type{}, CpeApp _type@Type{}, CpeApp arg] 1
+    cpe_app env (Var f) ((CpeApp _runtimeRep@Type{}) : (CpeApp _type@Type{}) : CpeApp arg : args) depth
         | f `hasKey` runRWKey
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
-        = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] 0
-            _          -> cpe_app env arg [CpeApp (Var realWorldPrimId)] 1
+        = pprTrace "cpe_app runRW sees" (ppr arg) $
+          pprTrace "with environment" (ppr env) $
+          case arg of
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] (depth - 1)
+            _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : args) depth
+
+    cpe_app env (Var f)
+            (a1@(CpeApp _runtimeRep@Type{}) : a2@(CpeApp _type@Type{}) : CpeApp arg : args)
+            depth
         | f `hasKey` runFWKey
-        -- Replace (runFW# f) by (f fakeWorld#), beta reducing if possible (this
-        -- is why we return a CorePrepEnv as well)
-        = case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s fakeWorldPrimId) body [] 0
-            _          -> cpe_app env arg [CpeApp (Var fakeWorldPrimId)] 1
+        -- Replace (runFW# f) by runRW# (f @RealWorld), beta reducing if
+        -- possible (this is why we return a CorePrepEnv as well)
+        = pprTrace "cpe_app runFW sees" (ppr arg) $
+          case arg of
+            Lam sTy body ->
+              cpe_app (extendCorePrepEnvExpr env sTy (Type realWorldTy))
+                      (Var runRWId) (a1 : a2 : CpeApp body : args) depth -- only type arg consumed
+            _ -> pprTrace "application looks like" (ppr (App arg (Type realWorldTy))) $
+                  cpe_app env (Var runRWId) (a1 : a2 : CpeApp (App arg (Type realWorldTy)) : args) depth
+
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
            ; let e2 = lookupCorePrepEnv env v1
@@ -871,7 +883,7 @@ cpeApp top_env expr
     -- all of which are used to possibly saturate this application if it
     -- has a constructor or primop at the head.
     rebuild_app
-        :: [ArgInfo]                  -- The arguments (inner to outer)
+        :: HasCallStack => [ArgInfo]                  -- The arguments (inner to outer)
         -> CpeApp
         -> Type
         -> Floats
@@ -891,8 +903,12 @@ cpeApp top_env expr
                    (_   : ss_rest, True)  -> (topDmd, ss_rest)
                    (ss1 : ss_rest, False) -> (ss1,    ss_rest)
                    ([],            _)     -> (topDmd, [])
-            (arg_ty, res_ty) = expectJust "cpeBody:collect_args" $
-                               splitFunTy_maybe fun_ty
+            (arg_ty, res_ty) =
+              case splitFunTy_maybe fun_ty of
+                Nothing -> pprPanic "cpeBody:collect_args" (ppr fun_ty)
+                Just x -> x
+ -- expectJust "cpeBody:collect_args" $
+  --                             splitFunTy_maybe fun_ty
         (fs, arg') <- cpeArg top_env ss1 arg arg_ty
         rebuild_app as (App fun' arg') res_ty (fs `appendFloats` floats) ss_rest
       CpeCast co ->
@@ -1437,6 +1453,9 @@ data CorePrepEnv
         , cpe_mkIntegerId     :: Id
         , cpe_integerSDataCon :: Maybe DataCon
     }
+
+instance Outputable CorePrepEnv where
+  ppr (CPE _df env mkint dc) = text "CPE <DynFlags>" <+> ppr env <+> ppr mkint <+> ppr dc
 
 lookupMkIntegerName :: DynFlags -> HscEnv -> IO Id
 lookupMkIntegerName dflags hsc_env

@@ -202,7 +202,7 @@ instance Fail.MonadFail (ST s) where
 -- The @forall@ ensures that the internal state used by the 'ST'
 -- computation is inaccessible to the rest of the program.
 runST :: (forall s. ST s a) -> a
-runST (ST st) = runFW# (\s -> case st (S# s) of (r, _) -> r)
+runST m = runFW# (\s -> case m of ST st -> case st (S# s) of (r, _) -> r)
 
 -- | Allow the result of a state transformer computation to be used (lazily)
 -- inside the computation.

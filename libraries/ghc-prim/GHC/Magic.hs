@@ -5,6 +5,7 @@
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE RankNTypes #-}
 
 -----------------------------------------------------------------------------
 -- |
@@ -119,8 +120,8 @@ runRW# = runRW#   -- The realWorld# is too much for haddock
 {-# NOINLINE runRW# #-}
 -- This is inlined manually in CorePrep
 
--- | Apply a function to a 'State# FakeWorld' token. When manually applying
--- a function to `fakeWorld#`, it is necessary to use `NOINLINE` to prevent
+-- | Apply a function to a 'State# RealWorld' token. When manually applying
+-- a function to `realWorld#`, it is necessary to use `NOINLINE` to prevent
 -- semantically undesirable floating. `runFW#` is inlined, but only very late
 -- in compilation after all floating is complete.
 
@@ -128,12 +129,12 @@ runRW# = runRW#   -- The realWorld# is too much for haddock
 -- unlifted type.
 
 runFW# :: forall (r :: RuntimeRep) (o :: TYPE r).
-          (State# FakeWorld -> o) -> o
+          (forall s . State# s -> o) -> o
 -- See Note [runRW magic] in MkId
 #if !defined(__HADDOCK_VERSION__)
-runFW# m = m fakeWorld#
+runFW# m = m realWorld#
 #else
-runFW# = runFW#   -- The fakeWorld# is too much for haddock
+runFW# = runFW#   -- The realWorld# is too much for haddock
 #endif
 {-# NOINLINE runFW# #-}
 -- This is inlined manually in CorePrep
