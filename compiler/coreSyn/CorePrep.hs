@@ -18,7 +18,7 @@ import OccurAnal
 
 import HscTypes
 import PrelNames
-import MkId             ( realWorldPrimId, runRWId )
+import MkId             ( realWorldPrimId )
 import CoreUtils
 import CoreArity
 import CoreFVs
@@ -813,25 +813,31 @@ cpeApp top_env expr
         | f `hasKey` runRWKey
         -- Replace (runRW# f) by (f realWorld#), beta reducing if possible (this
         -- is why we return a CorePrepEnv as well)
-        = pprTrace "cpe_app runRW sees" (ppr arg) $
-          pprTrace "with environment" (ppr env) $
+        = -- pprTrace "cpe_app runRW sees" (ppr arg) $
+          -- pprTrace "with environment" (ppr env) $
           case arg of
-            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId) body [] (depth - 1)
+            Lam s body -> cpe_app (extendCorePrepEnv env s realWorldPrimId)
+                                  body args (depth - 1)
             _          -> cpe_app env arg (CpeApp (Var realWorldPrimId) : args) depth
 
     cpe_app env (Var f)
-            (a1@(CpeApp _runtimeRep@Type{}) : a2@(CpeApp _type@Type{}) : CpeApp arg : args)
+            (CpeApp _runtimeRep@Type{} : CpeApp _type@Type{} : CpeApp arg : args)
             depth
         | f `hasKey` runFWKey
         -- Replace (runFW# f) by runRW# (f @RealWorld), beta reducing if
         -- possible (this is why we return a CorePrepEnv as well)
-        = pprTrace "cpe_app runFW sees" (ppr arg) $
+        = -- pprTrace "cpe_app runFW sees" (ppr arg) $
           case arg of
-            Lam sTy body ->
+            Lam sTy (Lam s body) ->
+              let env' = extendCorePrepEnvExpr env sTy (Type realWorldTy)
+                  env'' = extendCorePrepEnv env' s realWorldPrimId
+              in cpe_app env'' body args (depth - 1)
+            Lam sTy body -> -- only a type arg is consumed, so depth stays the same
               cpe_app (extendCorePrepEnvExpr env sTy (Type realWorldTy))
-                      (Var runRWId) (a1 : a2 : CpeApp body : args) depth -- only type arg consumed
-            _ -> pprTrace "application looks like" (ppr (App arg (Type realWorldTy))) $
-                  cpe_app env (Var runRWId) (a1 : a2 : CpeApp (App arg (Type realWorldTy)) : args) depth
+                      body (CpeApp (Var realWorldPrimId) : args) depth
+            _ -> --pprTrace "application looks like" (ppr (App arg (Type realWorldTy))) $
+                 cpe_app env arg (CpeApp (Type realWorldTy)
+                                    : CpeApp (Var realWorldPrimId) : args) depth
 
     cpe_app env (Var v) args depth
       = do { v1 <- fiddleCCall v
