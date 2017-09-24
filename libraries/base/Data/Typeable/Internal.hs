@@ -92,6 +92,7 @@ import {-# SOURCE #-} GHC.Fingerprint
    -- Better to break the loop here, because we want non-SOURCE imports
    -- of Data.Typeable as much as possible so we can optimise the derived
    -- instances.
+import Data.Typeable.Finger
 
 #include "MachDeps.h"
 
@@ -173,19 +174,30 @@ rnfTyCon (TyCon _ _ m n _ k) = rnfModule m `seq` rnfTrName n `seq` rnfKindRep k
 -- | A concrete representation of a (monomorphic) type.
 -- 'TypeRep' supports reasonably efficient equality.
 data TypeRep (a :: k) where
-    TrTyCon :: {-# UNPACK #-} !Fingerprint -> !TyCon -> [SomeTypeRep]
+    TrTyCon :: {-# UNPACK #-} !(SFingerprint a) -> !TyCon -> [SomeTypeRep]
             -> TypeRep (a :: k)
     TrApp   :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
-               {-# UNPACK #-} !Fingerprint
+               {-# UNPACK #-} !(SFingerprint (a b))
             -> TypeRep (a :: k1 -> k2)
             -> TypeRep (b :: k1)
             -> TypeRep (a b)
     TrFun   :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                       (a :: TYPE r1) (b :: TYPE r2).
-               {-# UNPACK #-} !Fingerprint
+               {-# UNPACK #-} !(SFingerprint (a -> b))
             -> TypeRep a
             -> TypeRep b
             -> TypeRep (a -> b)
+
+-- data Foo :: forall (blah :: j). blub -> forall (baz :: forall q. k). hoop hop -> TYPE hum
+
+data Crep
+
+{-
+data TRep (a :: k) where
+--  Cony :: !(SFingerprint a) ->
+  Tapp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
+          SFingerprint (a b)
+-}
 
 -- Compare keys for equality
 
@@ -242,9 +254,12 @@ pattern Fun arg res <- TrFun _ arg res
 --
 -- @since 4.8.0.0
 typeRepFingerprint :: TypeRep a -> Fingerprint
-typeRepFingerprint (TrTyCon fpr _ _) = fpr
-typeRepFingerprint (TrApp fpr _ _) = fpr
-typeRepFingerprint (TrFun fpr _ _) = fpr
+typeRepFingerprint = getFingerprint . typeRepSFingerprint
+
+typeRepSFingerprint :: TypeRep a -> SFingerprint a
+typeRepSFingerprint (TrTyCon fpr _ _) = fpr
+typeRepSFingerprint (TrApp fpr _ _) = fpr
+typeRepSFingerprint (TrFun fpr _ _) = fpr
 
 -- | Construct a representation for a type constructor
 -- applied at a monomorphic kind.
@@ -256,7 +271,7 @@ mkTrCon tc kind_vars = TrTyCon fpr tc kind_vars
   where
     fpr_tc  = tyConFingerprint tc
     fpr_kvs = map someTypeRepFingerprint kind_vars
-    fpr     = fingerprintFingerprints (fpr_tc:fpr_kvs)
+    fpr     = unsafeCoerce $ fingerprintFingerprints (fpr_tc:fpr_kvs)
 
 -- | Construct a representation for a type application.
 --
@@ -268,9 +283,9 @@ mkTrApp :: forall k1 k2 (a :: k1 -> k2) (b :: k1).
         -> TypeRep (a b)
 mkTrApp a b = TrApp fpr a b
   where
-    fpr_a = typeRepFingerprint a
-    fpr_b = typeRepFingerprint b
-    fpr   = fingerprintFingerprints [fpr_a, fpr_b]
+    fpr_a = typeRepSFingerprint a
+    fpr_b = typeRepSFingerprint b
+    fpr   = appSFingerprint fpr_a fpr_b
 
 -- | A type application.
 --
@@ -336,9 +351,7 @@ typeRepTyCon (TrFun _ _ _)    = typeRepTyCon $ typeRep @(->)
 -- @since 4.10
 eqTypeRep :: forall k1 k2 (a :: k1) (b :: k2).
              TypeRep a -> TypeRep b -> Maybe (a :~~: b)
-eqTypeRep a b
-  | typeRepFingerprint a == typeRepFingerprint b = Just (unsafeCoerce HRefl)
-  | otherwise                                    = Nothing
+eqTypeRep a b = eqFingerprint (typeRepSFingerprint a) (typeRepSFingerprint b)
 
 
 -------------------------------------------------------------
@@ -683,5 +696,5 @@ mkTrFun :: forall (r1 :: RuntimeRep) (r2 :: RuntimeRep)
                   (a :: TYPE r1) (b :: TYPE r2).
            TypeRep a -> TypeRep b -> TypeRep ((a -> b) :: Type)
 mkTrFun arg res = TrFun fpr arg res
-  where fpr = fingerprintFingerprints [ typeRepFingerprint arg
-                                      , typeRepFingerprint res]
+  where fpr = funSFingerprint (typeRepSFingerprint arg)
+                              (typeRepSFingerprint res)

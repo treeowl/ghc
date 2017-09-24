@@ -319,6 +319,7 @@ Library
         Data.OldList
         Data.Semigroup.Internal
         Data.Typeable.Internal
+        Data.Typeable.Finger
         Foreign.ForeignPtr.Imp
         GHC.StaticPtr.Internal
         System.Environment.ExecutablePath
