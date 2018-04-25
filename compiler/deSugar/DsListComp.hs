@@ -517,8 +517,8 @@ dsPArrComp (BindStmt _ p e _ _ : qs) = do
 
 dsPArrComp qs = do -- no ParStmt in `qs'
     sglP <- dsDPHBuiltin singletonPVar
-    let unitArray = mkApps (Var sglP) [Type unitTy, mkCoreTup []]
-    dePArrComp qs (noLoc $ WildPat unitTy) unitArray
+    let unitArray = mkApps (Var sglP) [Type soloTy, mkCoreTup []]
+    dePArrComp qs (noLoc $ WildPat soloTy) unitArray
 
 
 

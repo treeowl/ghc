@@ -63,7 +63,7 @@ module HsUtils(
   mkLastStmt,
   emptyTransStmt, mkGroupUsingStmt, mkGroupByUsingStmt,
   emptyRecStmt, emptyRecStmtName, emptyRecStmtId, mkRecStmt,
-  unitRecStmtTc,
+  soloRecStmtTc,
 
   -- Template Haskell
   mkHsSpliceTy, mkHsSpliceE, mkHsSpliceTE, mkUntypedSplice,
@@ -105,7 +105,7 @@ import RdrName
 import Var
 import TyCoRep
 import Type   ( filterOutInvisibleTypes )
-import TysWiredIn ( unitTy )
+import TysWiredIn ( soloTy )
 import TcType
 import DataCon
 import ConLike
@@ -303,7 +303,7 @@ mkBodyStmt body
   = BodyStmt noExt body noSyntaxExpr noSyntaxExpr
 mkBindStmt pat body
   = BindStmt noExt pat body noSyntaxExpr noSyntaxExpr
-mkTcBindStmt pat body = BindStmt unitTy pat body noSyntaxExpr noSyntaxExpr
+mkTcBindStmt pat body = BindStmt soloTy pat body noSyntaxExpr noSyntaxExpr
   -- don't use placeHolderTypeTc above, because that panics during zonking
 
 emptyRecStmt' :: forall idL idR body.
@@ -318,15 +318,15 @@ emptyRecStmt' tyVal =
      , recS_bind_fn = noSyntaxExpr
      , recS_ext = tyVal }
 
-unitRecStmtTc :: RecStmtTc
-unitRecStmtTc = RecStmtTc { recS_bind_ty = unitTy
+soloRecStmtTc :: RecStmtTc
+soloRecStmtTc = RecStmtTc { recS_bind_ty = soloTy
                           , recS_later_rets = []
                           , recS_rec_rets = []
-                          , recS_ret_ty = unitTy }
+                          , recS_ret_ty = soloTy }
 
 emptyRecStmt     = emptyRecStmt' noExt
 emptyRecStmtName = emptyRecStmt' noExt
-emptyRecStmtId   = emptyRecStmt' unitRecStmtTc
+emptyRecStmtId   = emptyRecStmt' soloRecStmtTc
                                         -- a panic might trigger during zonking
 mkRecStmt stmts  = emptyRecStmt { recS_stmts = stmts }
 

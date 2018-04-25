@@ -90,7 +90,7 @@ tcProc pat cmd exp_ty
         ; (co1, (arr_ty, arg_ty)) <- matchExpectedAppTy exp_ty1
         ; let cmd_env = CmdEnv { cmd_arr = arr_ty }
         ; (pat', cmd') <- tcPat ProcExpr pat (mkCheckExpType arg_ty) $
-                          tcCmdTop cmd_env cmd (unitTy, res_ty)
+                          tcCmdTop cmd_env cmd (soloTy, res_ty)
         ; let res_co = mkTcTransCo co
                          (mkTcAppCo co1 (mkTcNomReflCo res_ty))
         ; return (pat', cmd', res_co) }
@@ -284,7 +284,7 @@ tc_cmd env
 --              Do notation
 
 tc_cmd env (HsCmdDo _ (L l stmts) ) (cmd_stk, res_ty)
-  = do  { co <- unifyType Nothing unitTy cmd_stk  -- Expecting empty argument stack
+  = do  { co <- unifyType Nothing soloTy cmd_stk  -- Expecting empty argument stack
         ; stmts' <- tcStmts ArrowExpr (tcArrDoStmt env) stmts res_ty
         ; return (mkHsCmdWrap (mkWpCastN co) (HsCmdDo res_ty (L l stmts') )) }
 
@@ -358,7 +358,7 @@ matchExpectedCmdArgs n ty
 
 tcArrDoStmt :: CmdEnv -> TcCmdStmtChecker
 tcArrDoStmt env _ (LastStmt x rhs noret _) res_ty thing_inside
-  = do  { rhs' <- tcCmd env rhs (unitTy, res_ty)
+  = do  { rhs' <- tcCmd env rhs (soloTy, res_ty)
         ; thing <- thing_inside (panic "tcArrDoStmt")
         ; return (LastStmt x rhs' noret noSyntaxExpr, thing) }
 
@@ -411,7 +411,7 @@ tcArrDoStmt _ _ stmt _ _
 
 tc_arr_rhs :: CmdEnv -> LHsCmd GhcRn -> TcM (LHsCmd GhcTcId, TcType)
 tc_arr_rhs env rhs = do { ty <- newFlexiTyVarTy liftedTypeKind
-                        ; rhs' <- tcCmd env rhs (unitTy, ty)
+                        ; rhs' <- tcCmd env rhs (soloTy, ty)
                         ; return (rhs', ty) }
 
 {-

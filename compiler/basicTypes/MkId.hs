@@ -1578,7 +1578,7 @@ voidArgId = mkSysLocal (fsLit "void") voidArgIdKey voidPrimTy
 coercionTokenId :: Id         -- :: () ~ ()
 coercionTokenId -- Used to replace Coercion terms when we go to STG
   = pcMiscPrelId coercionTokenName
-                 (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, unitTy, unitTy])
+                 (mkTyConApp eqPrimTyCon [liftedTypeKind, liftedTypeKind, soloTy, soloTy])
                  noCafIdInfo
 
 pcMiscPrelId :: Name -> Type -> IdInfo -> Id
