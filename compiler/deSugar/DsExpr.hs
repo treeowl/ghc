@@ -1069,7 +1069,7 @@ warnDiscardedDoBindings rhs rhs_ty
        ; let norm_elt_ty = topNormaliseType fam_inst_envs elt_ty
 
            -- Warn about discarding non-() things in 'monadic' binding
-       ; if warn_unused && not (isUnitTy norm_elt_ty)
+       ; if warn_unused && not (isSoloTy norm_elt_ty)
          then warnDs (Reason Opt_WarnUnusedDoBind)
                      (badMonadBind rhs elt_ty)
          else

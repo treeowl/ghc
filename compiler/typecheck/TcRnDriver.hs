@@ -2040,7 +2040,7 @@ tcUserStmt (L loc (BodyStmt _ expr _ _))
                     -- Plan A
                     do { stuff@([it_id], _) <- tcGhciStmts [bind_stmt, print_it]
                        ; it_ty <- zonkTcType (idType it_id)
-                       ; when (isUnitTy $ it_ty) failM
+                       ; when (isSoloTy $ it_ty) failM
                        ; return stuff },
 
                         -- Plan B; a naked bind statement
@@ -2108,7 +2108,7 @@ tcUserStmt rdr_stmt@(L loc _)
     mk_print_result_plan stmt v
       = do { stuff@([v_id], _) <- tcGhciStmts [stmt, print_v]
            ; v_ty <- zonkTcType (idType v_id)
-           ; when (isUnitTy v_ty || not (isTauTy v_ty)) failM
+           ; when (isSoloTy v_ty || not (isTauTy v_ty)) failM
            ; return stuff }
       where
         print_v  = L loc $ BodyStmt noExt (nlHsApp (nlHsVar printName)

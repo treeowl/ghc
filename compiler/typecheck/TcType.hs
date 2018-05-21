@@ -78,7 +78,7 @@ module TcType (
   pickyEqType, tcEqType, tcEqKind, tcEqTypeNoKindCheck, tcEqTypeVis,
   isSigmaTy, isRhoTy, isRhoExpTy, isOverloadedTy,
   isFloatingTy, isDoubleTy, isFloatTy, isIntTy, isWordTy, isStringTy,
-  isIntegerTy, isBoolTy, isUnitTy, isCharTy, isCallStackTy, isCallStackPred,
+  isIntegerTy, isBoolTy, isSoloTy, isCharTy, isCallStackTy, isCallStackPred,
   hasIPPred, isTauTy, isTauTyCon, tcIsTyVarTy, tcIsForAllTy,
   isPredTy, isTyVarClassPred, isTyVarHead, isInsolubleOccursCheck,
   checkValidClsArgs, hasTyVarHead,
@@ -2200,14 +2200,14 @@ isOverloadedTy (FunTy a _)      = isPredTy a
 isOverloadedTy _                = False
 
 isFloatTy, isDoubleTy, isIntegerTy, isIntTy, isWordTy, isBoolTy,
-    isUnitTy, isCharTy, isAnyTy :: Type -> Bool
+    isSoloTy, isCharTy, isAnyTy :: Type -> Bool
 isFloatTy      = is_tc floatTyConKey
 isDoubleTy     = is_tc doubleTyConKey
 isIntegerTy    = is_tc integerTyConKey
 isIntTy        = is_tc intTyConKey
 isWordTy       = is_tc wordTyConKey
 isBoolTy       = is_tc boolTyConKey
-isUnitTy       = is_tc soloTyConKey
+isSoloTy       = is_tc soloTyConKey
 isCharTy       = is_tc charTyConKey
 isAnyTy        = is_tc anyTyConKey
 
