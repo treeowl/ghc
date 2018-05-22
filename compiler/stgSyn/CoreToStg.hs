@@ -36,7 +36,7 @@ import Module
 import Name             ( isExternalName, nameOccName, nameModule_maybe )
 import OccName          ( occNameFS )
 import BasicTypes       ( Arity )
-import TysWiredIn       ( unboxedUnitDataCon )
+import TysWiredIn       ( unboxedSoloDataCon )
 import Literal
 import Outputable
 import MonadUtils
@@ -471,7 +471,7 @@ coreToStgExpr (Case scrut bndr _ alts) = do
       )
   where
     vars_alt (con, binders, rhs)
-      | DataAlt c <- con, c == unboxedUnitDataCon
+      | DataAlt c <- con, c == unboxedSoloDataCon
       = -- This case is a bit smelly.
         -- See Note [Nullary unboxed tuple] in Type.hs
         -- where a nullary tuple is mapped to (State# World#)
