@@ -1430,7 +1430,7 @@ pattern_synonym_decl :: { LHsDecl GhcPs }
             {% do { let (name, args, as) = $2
                   ; mg <- mkPatSynMatchGroup name (snd $ unLoc $5)
                   ; ams (sLL $1 $> . ValD noExt $
-                           mkPatSynBind name args $4 (ExplicitBidirectional mg))
+                           mkPatSynBind name args $4 mg)
                        (as ++ ((mj AnnPattern $1:mu AnnLarrow $3:(fst $ unLoc $5))) )
                    }}
 
@@ -2343,10 +2343,13 @@ sigdecl :: { LHsDecl GhcPs }
         :
         -- See Note [Declaration/signature overlap] for why we need infixexp here
           infixexp_top '::' sigtypedoc
-                        {% do v <- checkValSigLhs $1
+                        {% do (style, v) <- checkValSigLhs $1
                         ; _ <- ams (sLL $1 $> ()) [mu AnnDcolon $2]
-                        ; return (sLL $1 $> $ SigD noExt $
-                                  TypeSig noExt [v] (mkLHsSigWcType $3)) }
+                        ; case style of
+                            IsVar -> return (sLL $1 $> $ SigD noExt $
+                                       TypeSig noExt [v] (mkLHsSigWcType $3))
+                            IsCon -> return (sLL $1 $> $ SigD noExt $
+                                       BuilderSig noExt v (mkLHsSigWcType $3)) }
 
         | var ',' sig_vars '::' sigtypedoc
            {% do { let sig = TypeSig noExt ($1 : reverse (unLoc $3))

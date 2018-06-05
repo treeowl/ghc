@@ -52,6 +52,7 @@ module   RdrHsSyn (
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
+        IsConOrVar,
         checkValSigLhs,
         checkDoAndIfThenElse,
         checkRecordSyntax,
@@ -110,6 +111,7 @@ import Text.ParserCombinators.ReadP as ReadP
 import Data.Char
 
 import Data.Data       ( dataTypeOf, fromConstr, dataTypeConstrs )
+import Data.Either     ( partitionEithers )
 
 #include "HsVersions.h"
 
@@ -566,12 +568,25 @@ checkInfixConstr ty = checkNoDocs msg ty' *> pure (ty', doc_string)
 
 mkPatSynMatchGroup :: Located RdrName
                    -> Located (OrdList (LHsDecl GhcPs))
-                   -> P (MatchGroup GhcPs (LHsExpr GhcPs))
+                   -> P (HsPatSynDir GhcPs)
 mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
-    do { matches <- mapM fromDecl (fromOL decls)
-       ; when (null matches) (wrongNumberErr loc)
-       ; return $ mkMatchGroup FromSource matches }
+    do { pieces <- mapM fromDecl (fromOL decls)
+       ; let (sigs,matchgroups) = partitionEithers pieces
+       ; msig <- case sigs of
+           [] -> return Nothing
+           [sig] -> return (Just _)
+           _:sig2:_ -> extraDeclErr loc sig2 }
+       ; matches <- case matchgroups of
+           [] -> emptyWhereErr loc
+           [m] -> m
+           _ -> extraDeclErr loc
+       ; return (ExplicitBidirectional msig (mkMatchGroup FromSource matches))
   where
+    fromDecl (L loc decl@(SigD _ (TypeSig _ ids sig))) = do
+      case ids of
+        [L idloc name] ->
+          do { unless (name == patsyn_name) $ wrongNameBindingErr loc decl
+             ; return (Left sig) }
     fromDecl (L loc decl@(ValD _ (PatBind _
                                    pat@(L _ (ConPatIn ln@(L _ name) details))
                                    rhs _))) =
@@ -592,20 +607,19 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
                      ctxt = FunRhs { mc_fun = ln, mc_fixity = Infix, mc_strictness = NoSrcStrict }
 
                RecCon{} -> recordPatSynErr loc pat
-           ; return $ L loc match }
-    fromDecl (L loc decl) = extraDeclErr loc decl
+           ; return $ Right $ L loc match }
+    -- fromDecl (L loc decl) = extraDeclErr loc decl
 
-    extraDeclErr loc decl =
+    extraDeclErr loc =
         parseErrorSDoc loc $
-        text "pattern synonym 'where' clause must contain a single binding:" $$
-        ppr decl
+        text "pattern synonym 'where' clause must contain a single binding"
 
     wrongNameBindingErr loc decl =
         parseErrorSDoc loc $
         text "pattern synonym 'where' clause must bind the pattern synonym's name" <+>
         quotes (ppr patsyn_name) $$ ppr decl
 
-    wrongNumberErr loc =
+    emptyWhereErr loc =
       parseErrorSDoc loc $
       text "pattern synonym 'where' clause cannot be empty" $$
       text "In the pattern synonym declaration for: " <+> ppr (patsyn_name)
@@ -1124,11 +1138,14 @@ checkPatBind msg lhs (L _ (_,grhss))
         ; return ([],PatBind noExt lhs grhss
                     ([],[])) }
 
-checkValSigLhs :: LHsExpr GhcPs -> P (Located RdrName)
+data IsConOrVar = IsCon | IsVar
+
+checkValSigLhs :: LHsExpr GhcPs -> P (IsConOrVar, Located RdrName)
 checkValSigLhs (L _ (HsVar _ lrdr@(L _ v)))
   | isUnqual v
-  , not (isDataOcc (rdrNameOcc v))
-  = return lrdr
+  = if isDataOcc (rdrNameOcc v)
+      then return (IsCon, lrdr)
+      else return (IsVar, lrdr)
 
 checkValSigLhs lhs@(L l _)
   = parseErrorSDoc l ((text "Invalid type signature:" <+>
@@ -1154,7 +1171,6 @@ checkValSigLhs lhs@(L l _)
     foreign_RDR = mkUnqual varName (fsLit "foreign")
     default_RDR = mkUnqual varName (fsLit "default")
     pattern_RDR = mkUnqual varName (fsLit "pattern")
-
 
 checkDoAndIfThenElse :: LHsExpr GhcPs
                      -> Bool

@@ -375,6 +375,8 @@ cvtDec (TH.DefaultSigD nm typ)
                      $ ClassOpSig noExt True [nm'] (mkLHsSigType ty')}
 
 cvtDec (TH.PatSynD nm args dir pat)
+  = error "TODO"
+{-
   = do { nm'   <- cNameL nm
        ; args' <- cvtArgs args
        ; dir'  <- cvtDir nm' dir
@@ -394,6 +396,7 @@ cvtDec (TH.PatSynD nm args dir pat)
     cvtDir n (ExplBidir cls) =
       do { ms <- mapM (cvtClause (mkPrefixFunRhs n)) cls
          ; return $ ExplicitBidirectional $ mkMatchGroup FromSource ms }
+-}
 
 cvtDec (TH.PatSynSigD nm ty)
   = do { nm' <- cNameL nm

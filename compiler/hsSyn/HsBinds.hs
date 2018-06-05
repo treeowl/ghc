@@ -793,8 +793,9 @@ instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR,
       ppr_rhs = case dir of
           Unidirectional           -> ppr_simple (text "<-")
           ImplicitBidirectional    -> ppr_simple equals
-          ExplicitBidirectional mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
-                                      (nest 2 $ pprFunBind mg)
+          ExplicitBidirectional msig mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
+                                      (nest 2 $ maybe empty ppr msig $$
+                                                pprFunBind mg)
   ppr (XPatSynBind x) = ppr x
 
 pprTicks :: SDoc -> SDoc -> SDoc
@@ -917,6 +918,14 @@ data Sig pass
     TypeSig
        (XTypeSig pass)
        [Located (IdP pass)]  -- LHS of the signature; e.g.  f,g,h :: blah
+       (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
+
+      -- | A pattern builder type signature
+      --
+      -- > F :: Num a => a -> a
+    BuilderSig
+       (XBuilderSig pass)
+       (Located (IdP pass)   -- LHS of the signature; e.g. F :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
@@ -1049,6 +1058,7 @@ data Sig pass
 
 type instance XTypeSig          (GhcPass p) = NoExt
 type instance XPatSynSig        (GhcPass p) = NoExt
+type instance XBuilderSig       (GHCPass p) = NoExt
 type instance XClassOpSig       (GhcPass p) = NoExt
 type instance XIdSig            (GhcPass p) = NoExt
 type instance XFixSig           (GhcPass p) = NoExt
