@@ -794,7 +794,7 @@ instance (idR ~ GhcPass pr,OutputableBndrId idL, OutputableBndrId idR,
           Unidirectional           -> ppr_simple (text "<-")
           ImplicitBidirectional    -> ppr_simple equals
           ExplicitBidirectional msig mg -> ppr_simple (text "<-") <+> ptext (sLit "where") $$
-                                      (nest 2 $ maybe empty ppr msig $$
+                                      (nest 2 $ maybe empty (\sig -> ppr psyn <+> text "::" <+> ppr sig) msig $$
                                                 pprFunBind mg)
   ppr (XPatSynBind x) = ppr x
 
@@ -923,9 +923,9 @@ data Sig pass
       -- | A pattern builder type signature
       --
       -- > F :: Num a => a -> a
-    BuilderSig
+  | BuilderSig
        (XBuilderSig pass)
-       (Located (IdP pass)   -- LHS of the signature; e.g. F :: blah
+       (Located (IdP pass))   -- LHS of the signature; e.g. F :: blah
        (LHsSigWcType pass)   -- RHS of the signature; can have wildcards
 
       -- | A pattern synonym type signature
@@ -1058,7 +1058,7 @@ data Sig pass
 
 type instance XTypeSig          (GhcPass p) = NoExt
 type instance XPatSynSig        (GhcPass p) = NoExt
-type instance XBuilderSig       (GHCPass p) = NoExt
+type instance XBuilderSig       (GhcPass p) = NoExt
 type instance XClassOpSig       (GhcPass p) = NoExt
 type instance XIdSig            (GhcPass p) = NoExt
 type instance XFixSig           (GhcPass p) = NoExt
@@ -1160,6 +1160,7 @@ isCompleteMatchSig _                            = False
 hsSigDoc :: Sig name -> SDoc
 hsSigDoc (TypeSig {})           = text "type signature"
 hsSigDoc (PatSynSig {})         = text "pattern synonym signature"
+hsSigDoc (BuilderSig {})        = text "pattern synonym builder signature"
 hsSigDoc (ClassOpSig _ is_deflt _ _)
  | is_deflt                     = text "default type signature"
  | otherwise                    = text "class method signature"
@@ -1184,6 +1185,8 @@ instance (p ~ GhcPass pass, OutputableBndrId p) => Outputable (Sig p) where
 
 ppr_sig :: (OutputableBndrId (GhcPass p)) => Sig (GhcPass p) -> SDoc
 ppr_sig (TypeSig _ vars ty)  = pprVarSig (map unLoc vars) (ppr ty)
+ppr_sig (BuilderSig _ var ty)
+  = pprVarSig [unLoc var] (ppr ty)
 ppr_sig (ClassOpSig _ is_deflt vars ty)
   | is_deflt                 = text "default" <+> pprVarSig (map unLoc vars) (ppr ty)
   | otherwise                = pprVarSig (map unLoc vars) (ppr ty)
@@ -1324,4 +1327,5 @@ instance Traversable RecordPatSynField where
 data HsPatSynDir id
   = Unidirectional
   | ImplicitBidirectional
-  | ExplicitBidirectional (Maybe (LSig id)) (MatchGroup id (LHsExpr id))
+  | ExplicitBidirectional (Maybe (LHsSigWcType id)) (MatchGroup id (LHsExpr id))
+--LHsSigWcType pass

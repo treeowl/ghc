@@ -52,7 +52,7 @@ module   RdrHsSyn (
         checkMonadComp,       -- P (HsStmtContext RdrName)
         checkCommand,         -- LHsExpr RdrName -> P (LHsCmd RdrName)
         checkValDef,          -- (SrcLoc, HsExp, HsRhs, [HsDecl]) -> P HsDecl
-        IsConOrVar,
+        IsConOrVar (..),
         checkValSigLhs,
         checkDoAndIfThenElse,
         checkRecordSyntax,
@@ -574,17 +574,14 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
        ; let (sigs,matchgroups) = partitionEithers pieces
        ; msig <- case sigs of
            [] -> return Nothing
-           [sig] -> return (Just _)
-           _:sig2:_ -> extraDeclErr loc sig2 }
+           [sig] -> return (Just sig)
+           _:_:_ -> extraDeclErr loc
        ; matches <- case matchgroups of
            [] -> emptyWhereErr loc
-           [m] -> m
-           _ -> extraDeclErr loc
-       ; return (ExplicitBidirectional msig (mkMatchGroup FromSource matches))
+           m -> return m
+       ; return (ExplicitBidirectional msig (mkMatchGroup FromSource matches)) }
   where
-    fromDecl (L loc decl@(SigD _ (TypeSig _ ids sig))) = do
-      case ids of
-        [L idloc name] ->
+    fromDecl (L loc decl@(SigD _ (BuilderSig _ (L idloc name) sig))) =
           do { unless (name == patsyn_name) $ wrongNameBindingErr loc decl
              ; return (Left sig) }
     fromDecl (L loc decl@(ValD _ (PatBind _
@@ -608,7 +605,7 @@ mkPatSynMatchGroup (L loc patsyn_name) (L _ decls) =
 
                RecCon{} -> recordPatSynErr loc pat
            ; return $ Right $ L loc match }
-    -- fromDecl (L loc decl) = extraDeclErr loc decl
+    fromDecl (L loc decl) = extraDeclErr loc
 
     extraDeclErr loc =
         parseErrorSDoc loc $

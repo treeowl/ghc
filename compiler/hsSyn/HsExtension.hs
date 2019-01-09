@@ -167,6 +167,7 @@ type ForallXIPBind (c :: * -> Constraint) (x :: *) =
 -- Sig type families
 type family XTypeSig          x
 type family XPatSynSig        x
+type family XBuilderSig       x
 type family XClassOpSig       x
 type family XIdSig            x
 type family XFixSig           x
@@ -180,6 +181,7 @@ type family XXSig             x
 
 type ForallXSig (c :: * -> Constraint) (x :: *) =
        ( c (XTypeSig          x)
+       , c (XBuilderSig       x)
        , c (XPatSynSig        x)
        , c (XClassOpSig       x)
        , c (XIdSig            x)

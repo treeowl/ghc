@@ -806,6 +806,7 @@ rep_sigs = concatMapM rep_sig
 rep_sig :: LSig GhcRn -> DsM [(SrcSpan, Core TH.DecQ)]
 rep_sig (L loc (TypeSig _ nms ty))    = mapM (rep_wc_ty_sig sigDName loc ty) nms
 rep_sig (L loc (PatSynSig _ nms ty))  = mapM (rep_patsyn_ty_sig loc ty) nms
+rep_sig (L loc (BuilderSig _ _ _))    = error "TODO: Deal with this"
 rep_sig (L loc (ClassOpSig _ is_deflt nms ty))
   | is_deflt                          = mapM (rep_ty_sig defaultSigDName loc ty) nms
   | otherwise                         = mapM (rep_ty_sig sigDName loc ty) nms
@@ -1640,10 +1641,10 @@ repRecordPatSynArgs (MkC sels) = rep2 recordPatSynName [sels]
 repPatSynDir :: HsPatSynDir GhcRn -> DsM (Core TH.PatSynDirQ)
 repPatSynDir Unidirectional        = rep2 unidirPatSynName []
 repPatSynDir ImplicitBidirectional = rep2 implBidirPatSynName []
-repPatSynDir (ExplicitBidirectional (MG { mg_alts = L _ clauses }))
+repPatSynDir (ExplicitBidirectional _sig (MG { mg_alts = L _ clauses })) -- TODO: Use sig
   = do { clauses' <- mapM repClauseTup clauses
        ; repExplBidirPatSynDir (nonEmptyCoreList clauses') }
-repPatSynDir (ExplicitBidirectional (XMatchGroup _)) = panic "repPatSynDir"
+repPatSynDir (ExplicitBidirectional _sig (XMatchGroup _)) = panic "repPatSynDir" -- TODO: Use sig
 
 repExplBidirPatSynDir :: Core [TH.ClauseQ] -> DsM (Core TH.PatSynDirQ)
 repExplBidirPatSynDir (MkC cls) = rep2 explBidirPatSynName [cls]

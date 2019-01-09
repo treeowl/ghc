@@ -709,8 +709,8 @@ rnPatSynBind sig_fn bind@(PSB { psb_id = L l name
                      ; return (ExplicitBidirectional Nothing mg', fvs) }
   
                 Just lsig ->
-                  do { (lsig', sig_fvs) <- renameSig lsig
-                     ; let vs = hsWcScopedTyVars lsig'
+                  do { (lsig', _sig_fvs) <- rnHsSigWcType (GenericCtx $ text "TODO") lsig
+                     ; let vs = hsWcScopedTvs lsig'
                      ; (mg', fvs) <- bindSigTyVarsFV vs $
                                      rnMatchGroup (mkPrefixFunRhs (L l name))
                                                   rnLExpr mg
@@ -972,6 +972,9 @@ renameSig ctxt sig@(TypeSig _ vs ty)
         ; (new_ty, fvs) <- rnHsSigWcType doc ty
         ; return (TypeSig noExt new_vs new_ty, fvs) }
 
+renameSig ctxt sig@(BuilderSig{})
+  = pprPanic "Unexpected BuilderSig in RnBinds.renameSig" (ppr sig)
+
 renameSig ctxt sig@(ClassOpSig _ is_deflt vs ty)
   = do  { defaultSigs_on <- xoptM LangExt.DefaultSignatures
         ; when (is_deflt && not defaultSigs_on) $
@@ -1088,6 +1091,8 @@ okHsSig ctxt (L _ sig)
 
      (PatSynSig {}, TopSigCtxt{}) -> True
      (PatSynSig {}, _)            -> False
+
+     (BuilderSig {}, _)               -> False
 
      (FixSig {}, InstDeclCtxt {}) -> False
      (FixSig {}, _)               -> True

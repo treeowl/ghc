@@ -1471,7 +1471,7 @@ decl_cls  : at_decl_cls                 { $1 }
 
           -- A 'default' signature used with the generic-programming extension
           | 'default' infixexp '::' sigtypedoc
-                    {% do { v <- checkValSigLhs $2
+                    {% do { (IsVar, v) <- checkValSigLhs $2
                           ; let err = text "in default signature" <> colon <+>
                                       quotes (ppr $2)
                           ; ams (sLL $1 $> $ SigD noExt $ ClassOpSig noExt True [v] $ mkLHsSigType $4)

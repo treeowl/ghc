@@ -568,9 +568,9 @@ zonkPatSynDir :: ZonkEnv -> HsPatSynDir GhcTcId
               -> TcM (ZonkEnv, HsPatSynDir GhcTc)
 zonkPatSynDir env Unidirectional        = return (env, Unidirectional)
 zonkPatSynDir env ImplicitBidirectional = return (env, ImplicitBidirectional)
-zonkPatSynDir env (ExplicitBidirectional mg) = do
+zonkPatSynDir env (ExplicitBidirectional msig mg) = do  -- TODO: use type signature
     mg' <- zonkMatchGroup env zonkLExpr mg
-    return (env, ExplicitBidirectional mg')
+    return (env, ExplicitBidirectional msig mg')
 
 zonkSpecPrags :: ZonkEnv -> TcSpecPrags -> TcM TcSpecPrags
 zonkSpecPrags _   IsDefaultMethod = return IsDefaultMethod

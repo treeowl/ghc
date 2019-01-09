@@ -53,8 +53,10 @@ import FieldLabel
 import Bag
 import Util
 import ErrUtils
-import Control.Monad ( zipWithM )
+import Control.Monad ( zipWithM, unless )
 import Data.List( partition )
+import TcHsType (tcHsPartialSigType)
+import Data.Maybe (isNothing)
 
 #include "HsVersions.h"
 
@@ -584,13 +586,20 @@ tc_patsyn_finish lname dir is_infix lpat'
                                          (args, arg_tys)
                                          pat_ty
 
-       ;
-
        -- Make the 'builder'
-       ; builder_id <- mkPatSynBuilderId dir lname
-                                         univ_tvs req_theta
-                                         ex_tvs   prov_theta
-                                         arg_tys pat_ty
+       ; builder_id <- case dir of
+           ExplicitBidirectional (Just builder_sig) _ -> do
+             (wildcards, ec_wildcard, orig_tyvar_names, bound_names, theta, tau) <- tcHsPartialSigType PatSigCtxt builder_sig
+             builder_name <- newImplicitBinder (unLoc lname) mkBuilderOcc
+             unless (null wildcards && isNothing ec_wildcard) $ addErrTc (text "Wildcards for pattern builders are not yet implemented.")
+             let need_dummy_arg = isUnliftedType tau && null theta
+                 builder_sigma = add_void need_dummy_arg $ mkForAllTys (mkTyVarBinders Specified bound_names) $ mkFunTys theta $ tau
+                 builder_id = mkExportedVanillaId builder_name builder_sigma
+             return $ Just (builder_id, need_dummy_arg)
+           _ -> mkPatSynBuilderId dir lname
+                         univ_tvs req_theta
+                         ex_tvs   prov_theta
+                         arg_tys pat_ty
 
          -- TODO: Make this have the proper information
        ; let mkFieldLabel name = FieldLabel { flLabel = occNameFS (nameOccName name)
@@ -735,11 +744,10 @@ mkPatSynBuilderId :: HsPatSynDir a -> Located Name
                   -> [TyVarBinder] -> ThetaType
                   -> [TyVarBinder] -> ThetaType
                   -> [Type] -> Type
-                  -> Maybe Type
                   -> TcM (Maybe (Id, Bool))
 mkPatSynBuilderId dir (L _ name)
                   univ_bndrs req_theta ex_bndrs prov_theta
-                  arg_tys pat_ty user_written_ty
+                  arg_tys pat_ty
   | isUnidirectional dir
   = return Nothing
   | otherwise
@@ -752,10 +760,7 @@ mkPatSynBuilderId dir (L _ name)
                               mkFunTys theta $
                               mkFunTys arg_tys $
                               pat_ty
-             builder_id     = mkExportedVanillaId builder_name $
-                                case user_written_ty of
-                                  Just t -> t
-                                  Nothing -> builder_sigma
+             builder_id     = mkExportedVanillaId builder_name builder_sigma
              -- This is where the builder id is created.
               -- See Note [Exported LocalIds] in Id
 
@@ -779,7 +784,7 @@ tcPatSynBuilderBind (PSB { psb_id = L loc name, psb_def = lpat
               2 why
          , text "RHS pattern:" <+> ppr lpat ]
 
-  | Right (sig, match_group) <- mb_match_group  -- Bidirectional
+  | Right (_msig, match_group) <- mb_match_group  -- Bidirectional
   = do { patsyn <- tcLookupPatSyn name
        ; let Just (builder_id, need_dummy_arg) = patSynBuilder patsyn
                    -- Bidirectional, so patSynBuilder returns Just
